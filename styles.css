@@ -1,0 +1,40 @@
+.kobo-annotation-file-picker {
+	width: 100%;
+	font-family: inherit;
+	font-size: 1rem;
+	color: var(--interactive-accent);
+	background-color: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	padding: 5px;
+	cursor: pointer;
+	outline: none;
+	transition:
+		background-color 0.3s,
+		border-color 0.3s;
+}
+
+.kobo-annotation-file-picker:hover {
+	border-color: var(--interactive-accent);
+}
+
+.kobo-annotation-file-picker:focus-within {
+	box-shadow: 0 0 5px var(--interactive-accent);
+	border-color: var(--interactive-accent);
+}
+
+.kobo-chapter-list {
+	display: flex;
+	flex-direction: column;
+}
+
+.kobo-section-checkbox-container {
+	display: flex;
+	flex-direction: row;
+	padding-left: 1rem;
+}
+
+.kobo-chapter-checkbox-container {
+	display: flex;
+	flex-direction: row;
+}

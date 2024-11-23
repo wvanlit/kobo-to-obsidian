@@ -1,0 +1,11 @@
+{
+	"id": "kobo-annotation-to-obsidian",
+	"name": "Kobo Annotation to Obsidian",
+	"version": "1.0.0",
+	"minAppVersion": "0.15.0",
+	"description": "Import annotations from Kobo eReader to Obsidian",
+	"author": "Wessel van Lit",
+	"authorUrl": "https://github.com/wvanlit",
+	"fundingUrl": "",
+	"isDesktopOnly": false
+}
