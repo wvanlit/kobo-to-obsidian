@@ -1,7 +1,7 @@
 import { findCommonPrefix, findCommonSuffix, groupByPrefix } from "./string";
 
-type Section = { file: string; pretty: string };
-type ChapterWithSections = { chapter: string; sections: Section[] };
+export type Section = { file: string; pretty: string };
+export type ChapterWithSections = { chapter: string; sections: Section[] };
 
 export default class ChapterList {
 	chapters: ChapterWithSections[];
@@ -17,7 +17,7 @@ export default class ChapterList {
 			section.slice(
 				commonPrefix.length,
 				section.length - commonSuffix.length,
-			),
+			)
 		);
 
 		const grouped = groupByPrefix(prettySections);

@@ -2,6 +2,7 @@ import { Modal, App } from "obsidian";
 import ChapterList from "./chapter-list";
 import AnnotationParser, { KoboAnnotation } from "./parser";
 import { KoboToMarkdownSettings } from "./settings";
+import MarkdownWriter from "./markdown-writer";
 
 export class KoboAnnotationSelectionModal extends Modal {
 	annotations: KoboAnnotation[];
@@ -87,22 +88,15 @@ export class KoboAnnotationSelectionModal extends Modal {
 			(c) => (c as HTMLInputElement).value,
 		);
 
-		const sectionHeadingLevel =
-			parseInt(this.settings.chapterHeadingLevel.replace("h", "")) + 1;
-		const sectionHeading = "".padStart(sectionHeadingLevel, "#");
-
-		const text = selectedSections
-			.map((chapter) => {
-				const annotations = this.annotations
-					.filter((a) => a.chapter?.file === chapter)
-					.map((a) => a.text);
-
-				return `${sectionHeading} ${chapter}\n\n${annotations.join("\n\n")}`;
-			})
-			.join("\n\n");
+		const writer = new MarkdownWriter(
+			this.annotations,
+			this.chapterList.chapters,
+			selectedSections,
+			this.settings,
+		)
 
 		contentEl.empty();
 
-		editor.replaceSelection(text);
+		editor.replaceSelection(writer.writeMarkdown());
 	}
 }
