@@ -53,8 +53,6 @@ export function groupByPrefix(list: string[]): TreeNode[] {
 	const result: TreeNode[] = [];
 	const todo = list.slice();
 
-	debugger;
-
 	let node: TreeNode | null = null;
 
 	while (todo.length !== 0) {
@@ -72,8 +70,8 @@ export function groupByPrefix(list: string[]): TreeNode[] {
 		const commonPrefix = findCommonPrefix([currentItem, node.prefix]);
 		const commonPrefixIsSubset = commonPrefix.startsWith(node.prefix);
 		const prefixIsSubset = node.prefix.startsWith(commonPrefix);
-		const addToNode =
-			commonPrefix !== "" && (commonPrefixIsSubset || prefixIsSubset);
+		const addToNode = commonPrefix !== "" &&
+			(commonPrefixIsSubset || prefixIsSubset);
 
 		if (addToNode) {
 			node.items.push(currentItem);
