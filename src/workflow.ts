@@ -10,7 +10,7 @@ import {
   type KoboDrivePath,
 } from "./extraction";
 
-export function extractAnnotationData(
+export async function extractAnnotationData(
   annotationFilePath: AnnotationFilePath,
   koboDrivePath: KoboDrivePath
 ) {
@@ -21,7 +21,7 @@ export function extractAnnotationData(
     );
   }
 
-  const toc = extractTableOfContents(epubFilePath);
+  const toc = await extractTableOfContents(epubFilePath);
   const publication = extractPublication(annotationFilePath);
   const annotations = extractAnnotations(annotationFilePath);
 
