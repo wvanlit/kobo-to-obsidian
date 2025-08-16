@@ -1,4 +1,7 @@
+#!/usr/bin/env bun
+
 import {
+  extractPublication,
   findAllAnnotationFiles,
   findMatchingEpubFile,
   type KoboDrivePath,
@@ -20,12 +23,8 @@ const epubWithAnnotations = annotFiles.map((file) => {
 });
 
 epubWithAnnotations.forEach(({ annotationFile, epubFile }) => {
-  const readablePath = annotationFile
-    .replace(drive, "")
-    .replace("Digital Editions/Annotations/Books/", "")
-    .replace(/\.epub\.annot$/, "");
+  const hasEpub = epubFile ? "📚" : "❌";
+  const title = extractPublication(annotationFile).title;
 
-  const hasEpub = epubFile ? "Yes" : "No";
-
-  console.log(`${readablePath} | Has EPUB: ${hasEpub}`);
+  console.log(`${hasEpub} ${title}`);
 });

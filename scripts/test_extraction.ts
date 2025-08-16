@@ -1,8 +1,5 @@
 #!/usr/bin/env bun
 
-/**
- * Comprehensive test of the extraction module
- */
 import {
   extractPublication,
   extractAnnotations,

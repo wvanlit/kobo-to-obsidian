@@ -7,9 +7,11 @@ import JSZip from "jszip";
 import { DOMParser } from "xmldom";
 import xpath from "xpath";
 
-export type KoboDrivePath = string & { __type: KoboDrivePath };
-export type EpubFilePath = string & { __type: EpubFilePath };
-export type AnnotationFilePath = string & { __type: AnnotationFilePath };
+export type KoboDrivePath = string & { readonly KoboDrivePath: unique symbol };
+export type EpubFilePath = string & { readonly EpubFilePath: unique symbol };
+export type AnnotationFilePath = string & {
+  readonly AnnotationFilePath: unique symbol;
+};
 
 export type EpubTableOfContents = {
   chapter: string;
@@ -211,23 +213,24 @@ export async function extractTableOfContents(
         ".//*[local-name()='navLabel']/*[local-name()='text']/text()",
         navPoint
       ) as any[];
-      
+
       // Extract the source file from the content element
       const contentNodes = xpath.select(
         ".//*[local-name()='content']",
         navPoint
       ) as any[];
-      
+
       if (navLabels.length > 0) {
         const chapterTitle = navLabels[0].textContent?.trim();
-        const source = contentNodes.length > 0 
-          ? contentNodes[0].getAttribute("src") || "" 
-          : "";
-        
+        const source =
+          contentNodes.length > 0
+            ? contentNodes[0].getAttribute("src") || ""
+            : "";
+
         if (chapterTitle) {
-          chapters.push({ 
+          chapters.push({
             chapter: chapterTitle,
-            source: source
+            source: source,
           });
         }
       }
