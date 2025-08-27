@@ -326,3 +326,152 @@ export function extractAnnotations(
     return [];
   }
 }
+
+// Helpers for grouping annotations by actual chapter (document file)
+function normalizeHrefToDocPath(href: string): string {
+  // Remove fragment and normalize to posix path
+  const noFragment = (href ?? "").split("#")[0] ?? "";
+  const posixPath = noFragment.replace(/\\/g, "/");
+  // Remove leading './' or '/'
+  const cleaned = posixPath.replace(/^\.?\/?/, "");
+  // Normalize any redundant segments
+  return path.posix.normalize(cleaned);
+}
+
+function docPathFromAnnotationStart(start: string): string {
+  return normalizeHrefToDocPath(start);
+}
+
+export type ChapterGroupedAnnotations = {
+  chapter: string; // resolved chapter title (top-level when subchapters exist)
+  source: string; // normalized document path used for grouping (e.g., OEBPS/chap03.xhtml or chap03.xhtml)
+  annotations: Annotation[];
+};
+
+/**
+ * Group annotations by their actual chapter (document file), collapsing subchapters.
+ * - Matches each annotation's source document to the first TOC entry that references that document.
+ * - Preserves TOC order for resulting groups; unmatched docs are appended in encounter order.
+ */
+export function groupAnnotationsByChapter(
+  annotations: Annotation[],
+  toc: EpubTableOfContents
+): ChapterGroupedAnnotations[] {
+  // Prepare TOC entries normalized (remove fragments, normalize to posix)
+  const tocEntries = toc.map((t, idx) => {
+    const docPath = normalizeHrefToDocPath(t.source);
+    return { index: idx, docPath, chapter: t.chapter };
+  });
+
+  // Build a quick lookup for the first occurrence of a docPath in the TOC (top-level over subchapters)
+  const firstDocPathToToc = new Map<
+    string,
+    { index: number; chapter: string }
+  >();
+  for (const entry of tocEntries) {
+    if (!entry.docPath) continue;
+    // Keep the first occurrence only (likely top-level navPoint precedes children)
+    if (!firstDocPathToToc.has(entry.docPath)) {
+      firstDocPathToToc.set(entry.docPath, {
+        index: entry.index,
+        chapter: entry.chapter,
+      });
+    }
+  }
+
+  // Also allow basename-only matches as a fallback (helps when annotation path has extra prefix like 'OEBPS/')
+  const basenameToToc = new Map<
+    string,
+    { index: number; chapter: string; docPath: string }
+  >();
+  for (const entry of tocEntries) {
+    const base = path.posix.basename(entry.docPath);
+    if (!basenameToToc.has(base)) {
+      basenameToToc.set(base, {
+        index: entry.index,
+        chapter: entry.chapter,
+        docPath: entry.docPath,
+      });
+    }
+  }
+
+  type Group = {
+    key: string; // chosen normalized docPath key (prefer TOC docPath)
+    chapter: string;
+    source: string;
+    annotations: Annotation[];
+    order: number; // TOC order or large + encounter order for unmatched
+  };
+
+  const groups = new Map<string, Group>();
+  let unmatchedCounter = 0;
+
+  function addToGroup(
+    key: string,
+    chapter: string,
+    source: string,
+    order: number,
+    ann: Annotation
+  ) {
+    let g = groups.get(key);
+    if (!g) {
+      g = { key, chapter, source, annotations: [], order };
+      groups.set(key, g);
+    }
+    g.annotations.push(ann);
+  }
+
+  for (const ann of annotations) {
+    const annDocPath = docPathFromAnnotationStart(ann.start);
+
+    // Exact TOC docPath match
+    let matchedKey: string | null = null;
+    let matched = null as { index: number; chapter: string } | null;
+
+    if (firstDocPathToToc.has(annDocPath)) {
+      matched = firstDocPathToToc.get(annDocPath)!;
+      matchedKey = annDocPath;
+    } else {
+      // endsWith match (annotation path may include extra folder prefix)
+      for (const [docPath, info] of firstDocPathToToc.entries()) {
+        if (annDocPath.endsWith("/" + docPath) || annDocPath === docPath) {
+          matched = info;
+          matchedKey = docPath; // prefer canonical TOC docPath as the key
+          break;
+        }
+      }
+
+      // basename fallback
+      if (!matched) {
+        const base = path.posix.basename(annDocPath);
+        const baseHit = basenameToToc.get(base);
+        if (baseHit) {
+          matched = { index: baseHit.index, chapter: baseHit.chapter };
+          matchedKey = baseHit.docPath;
+        }
+      }
+    }
+
+    if (matched && matchedKey) {
+      addToGroup(matchedKey, matched.chapter, matchedKey, matched.index, ann);
+    } else {
+      // Unmatched: group by the annotation document itself, append after TOC-ordered groups
+      const fallbackKey = annDocPath;
+      const fallbackChapter =
+        path.posix.basename(annDocPath) || "Unknown Chapter";
+      const order = Number.MAX_SAFE_INTEGER / 2 + unmatchedCounter++;
+      addToGroup(fallbackKey, fallbackChapter, annDocPath, order, ann);
+    }
+  }
+
+  // Return groups sorted by order (TOC order first), and stable within same order by key
+  return Array.from(groups.values())
+    .sort((a, b) =>
+      a.order === b.order ? a.key.localeCompare(b.key) : a.order - b.order
+    )
+    .map((g) => ({
+      chapter: g.chapter,
+      source: g.source,
+      annotations: g.annotations,
+    }));
+}
