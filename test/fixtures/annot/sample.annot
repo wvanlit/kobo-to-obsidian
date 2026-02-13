@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<annotations>
+  <title>Sample Book</title>
+  <author>Ada Lovelace</author>
+  <bookId>book-123</bookId>
+  <annotation>
+    <id>a-1</id>
+    <date>2024-01-01T10:00:00Z</date>
+    <target>
+      <fragment start="OEBPS/Text/ch01.xhtml#point(/1/4/2:0)" end="OEBPS/Text/ch01.xhtml#point(/1/4/2:12)" />
+    </target>
+    <highlight>  First   highlight   line  </highlight>
+    <content>
+      <text>  Important note  </text>
+    </content>
+    <progress>0.25</progress>
+    <color>2</color>
+  </annotation>
+  <annotation>
+    <id>a-2</id>
+    <date>2024-01-02T11:00:00Z</date>
+    <target>
+      <fragment start="OEBPS/Text/ch02.xhtml#point(/1/4/2:0)" end="OEBPS/Text/ch02.xhtml#point(/1/4/2:10)" />
+    </target>
+    <highlight>Second highlight</highlight>
+  </annotation>
+</annotations>
