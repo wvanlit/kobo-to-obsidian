@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<annotationSet xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns="http://ns.adobe.com/digitaleditions/annotations">
+  <publication>
+    <dc:identifier>B0D18J83VB</dc:identifier>
+    <dc:title>A System for Writing: How an Unconventional Approach to Note-Making Can Help You Capture Ideas</dc:title>
+    <dc:creator>Bob Doto</dc:creator>
+  </publication>
+  <annotation>
+    <dc:identifier>urn:uuid:1</dc:identifier>
+    <dc:date>2025-09-20T12:49:28Z</dc:date>
+    <target>
+      <fragment start="text/part0000_split_020.html#point(/1/4/2/39:4)" end="text/part0000_split_020.html#point(/1/4/2/41:1)" progress="0.9" color="0">
+        <text>  Later highlight  </text>
+      </fragment>
+    </target>
+  </annotation>
+  <annotation>
+    <dc:identifier>urn:uuid:2</dc:identifier>
+    <dc:date>2025-09-21T12:48:16Z</dc:date>
+    <target>
+      <fragment start="text/part0000_split_005.html#point(/1/4/2/34:1)" end="text/part0000_split_005.html#point(/1/4/2/36:5)" progress="0.1" color="2">
+        <text>  Earlier highlight  </text>
+      </fragment>
+    </target>
+  </annotation>
+</annotationSet>

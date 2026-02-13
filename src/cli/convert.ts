@@ -38,6 +38,7 @@ async function main() {
 		interactive: args.interactive,
 		selectAll: args.selectAll,
 		includeBooks,
+		aiRefactor: args.aiRefactor,
 	});
 
 	console.log(`Books processed: ${result.booksProcessed}`);

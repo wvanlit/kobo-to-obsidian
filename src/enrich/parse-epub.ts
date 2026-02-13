@@ -138,31 +138,126 @@ function readNavChapters(
 	manifest: ManifestItem[],
 	opfDir: string,
 ): ChapterRef[] {
-	const navItem =
-		manifest.find((item) => item.properties?.split(" ").includes("nav")) ??
-		manifest.find((item) => item.href.toLowerCase().includes("nav")) ??
-		manifest.find((item) => item.mediaType === "application/x-dtbncx+xml");
-
-	if (!navItem) {
+	const navItems = manifest.filter((item) => isNavigationManifestItem(item));
+	if (navItems.length === 0) {
 		return [];
 	}
 
-	const navPath = normalizeArchivePath(path.posix.join(opfDir, navItem.href));
+	const candidates = navItems
+		.map((item) => readChapterCandidate(archive, item, opfDir))
+		.filter((candidate): candidate is ChapterRef[] => candidate.length > 0);
+
+	if (candidates.length === 0) {
+		return [];
+	}
+
+	return pickBestChapterCandidate(candidates);
+}
+
+function isNavigationManifestItem(item: ManifestItem): boolean {
+	if (item.properties?.split(" ").includes("nav")) {
+		return true;
+	}
+
+	if (item.mediaType === "application/x-dtbncx+xml") {
+		return true;
+	}
+
+	const href = item.href.toLowerCase();
+	return href.includes("nav") || href.includes("toc");
+}
+
+function readChapterCandidate(
+	archive: Record<string, Uint8Array>,
+	manifestItem: ManifestItem,
+	opfDir: string,
+): ChapterRef[] {
+	const navPath = normalizeArchivePath(
+		path.posix.join(opfDir, manifestItem.href),
+	);
 	const navXml = asText(archive[navPath]);
 	if (!navXml) {
 		return [];
 	}
 
+	const navDoc = parser.parse(navXml) as Record<string, unknown>;
+
 	if (
-		navItem.mediaType === "application/x-dtbncx+xml" ||
+		manifestItem.mediaType === "application/x-dtbncx+xml" ||
 		navPath.endsWith(".ncx")
 	) {
-		const navDoc = parser.parse(navXml) as Record<string, unknown>;
 		return readNcxChapters(navDoc, opfDir);
 	}
 
-	const navDoc = parser.parse(navXml) as Record<string, unknown>;
 	return readXhtmlNavChapters(navDoc, opfDir);
+}
+
+function pickBestChapterCandidate(candidates: ChapterRef[][]): ChapterRef[] {
+	let best = candidates[0] ?? [];
+	let bestScore = scoreChapterCandidate(best);
+
+	for (const candidate of candidates.slice(1)) {
+		const score = scoreChapterCandidate(candidate);
+		if (score > bestScore) {
+			best = candidate;
+			bestScore = score;
+		}
+	}
+
+	return best;
+}
+
+function scoreChapterCandidate(chapters: ChapterRef[]): number {
+	if (chapters.length === 0) {
+		return Number.NEGATIVE_INFINITY;
+	}
+
+	return chapters.reduce(
+		(score, chapter) => score + scoreChapterTitle(chapter.title),
+		0,
+	);
+}
+
+function scoreChapterTitle(title: string): number {
+	const normalized = title.trim().toLowerCase();
+	if (!normalized) {
+		return -4;
+	}
+
+	if (looksLikeSplitLabel(normalized)) {
+		return -5;
+	}
+
+	if (/^chapter\s+\d+$/i.test(normalized)) {
+		return -2;
+	}
+
+	let score = 0;
+	if (normalized.split(/\s+/).length >= 3) {
+		score += 2;
+	}
+	if (/[?!.:]$/.test(normalized)) {
+		score += 1;
+	}
+	if (/[a-z]{4,}\s+[a-z]{4,}/i.test(normalized)) {
+		score += 1;
+	}
+
+	const digitCount = (normalized.match(/\d/g) ?? []).length;
+	if (digitCount > 0) {
+		score -= Math.min(2, digitCount);
+	}
+
+	return score;
+}
+
+function looksLikeSplitLabel(title: string): boolean {
+	if (/^part\s*\d+\s*split\s*\d+$/i.test(title)) {
+		return true;
+	}
+
+	const compact = title.replaceAll(/[_-]+/g, " ").replaceAll(/\s+/g, " ");
+	return /part\s*\d+/i.test(compact) && /split\s*\d+/i.test(compact);
 }
 
 function readXhtmlNavChapters(

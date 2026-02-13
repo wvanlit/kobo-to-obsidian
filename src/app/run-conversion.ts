@@ -16,6 +16,8 @@ import { discoverAnnotFiles } from "../ingest/discover-annot-files";
 import { parseAnnotFile } from "../ingest/parse-annot";
 import { resolveInputSource } from "../ingest/resolve-input-source";
 import { writeOutputDocuments } from "../io/write-output";
+import type { AiRefactorOptions } from "../refactor/ai-refactor-config";
+import { refactorDocumentsWithOpenCode } from "../refactor/refactor-documents-with-opencode";
 
 export interface ConversionOptions {
 	input?: InputSource;
@@ -24,6 +26,11 @@ export interface ConversionOptions {
 	interactive: boolean;
 	selectAll?: boolean;
 	includeBooks?: string[];
+	aiRefactor?: AiRefactorOptions;
+}
+
+export interface ConversionDependencies {
+	refactorDocuments?: typeof refactorDocumentsWithOpenCode;
 }
 
 export interface ConversionResult {
@@ -34,6 +41,7 @@ export interface ConversionResult {
 
 export async function runConversion(
 	options: ConversionOptions,
+	dependencies: ConversionDependencies = {},
 ): Promise<ConversionResult> {
 	const warnings: string[] = [];
 	const inputSource =
@@ -58,7 +66,12 @@ export async function runConversion(
 			author: book.authorFromAnnot,
 		});
 
-		const epubPath = await locateEpubForAnnot(book.sourceAnnotPath);
+		const epubPath = await locateEpubForAnnot(book.sourceAnnotPath, {
+			searchRoot:
+				inputSource.kind === "directory"
+					? inputSource.path
+					: inputSource.mountPath,
+		});
 		if (epubPath) {
 			try {
 				const epubMetadata = await parseEpubMetadata(epubPath);
@@ -88,7 +101,20 @@ export async function runConversion(
 		});
 
 		const docs = buildExportPlan(enrichedBook, options.mode);
-		const written = await writeOutputDocuments(options.outputDir, docs);
+		let outputDocs = docs;
+
+		if (options.aiRefactor) {
+			const refactor =
+				dependencies.refactorDocuments ?? refactorDocumentsWithOpenCode;
+			const refactorResult = await refactor({
+				documents: docs,
+				model: options.aiRefactor.model,
+			});
+			outputDocs = refactorResult.documents;
+			warnings.push(...refactorResult.warnings);
+		}
+
+		const written = await writeOutputDocuments(options.outputDir, outputDocs);
 		filesWritten.push(...written);
 	}
 
@@ -152,9 +178,10 @@ function deriveFallbackChapters(
 		const fileName = path.posix.basename(fragmentPath);
 		const rawTitle = fileName
 			.replace(/\.[^./]+$/, "")
+			.replace(/([a-z])([0-9])/gi, "$1 $2")
 			.replaceAll(/[-_]+/g, " ")
 			.trim();
-		const title = rawTitle ? capitalize(rawTitle) : `Chapter ${order + 1}`;
+		const title = rawTitle ? toTitleCase(rawTitle) : `Chapter ${order + 1}`;
 		return ChapterRef.create({
 			id: asChapterId(`chapter-${order + 1}`),
 			title,
@@ -166,4 +193,12 @@ function deriveFallbackChapters(
 
 function capitalize(value: string): string {
 	return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function toTitleCase(value: string): string {
+	return value
+		.split(/\s+/)
+		.filter(Boolean)
+		.map((word) => capitalize(word.toLowerCase()))
+		.join(" ");
 }

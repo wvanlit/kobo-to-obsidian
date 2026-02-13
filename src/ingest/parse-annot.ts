@@ -44,26 +44,13 @@ export async function parseAnnotFile(
 			"book_id",
 			"volumeid",
 			"contentid",
+			"identifier",
 		]);
 
 		const annotationNodes = collectAnnotationNodes(parsed);
 		const annotations = annotationNodes
 			.map((node, index) => parseAnnotationNode(node, index))
-			.filter((value): value is Annotation => value !== undefined)
-			.sort((a, b) => {
-				const byTime = a.createdAt.getTime() - b.createdAt.getTime();
-				if (byTime !== 0) {
-					return byTime;
-				}
-
-				const progressA = a.progress ?? 0;
-				const progressB = b.progress ?? 0;
-				if (progressA !== progressB) {
-					return progressA - progressB;
-				}
-
-				return a.id.localeCompare(b.id);
-			});
+			.filter((value): value is Annotation => value !== undefined);
 
 		return BookAggregate.create({
 			sourceAnnotPath: asAnnotFilePath(path),
@@ -100,8 +87,13 @@ function parseAnnotationNode(
 	}
 
 	const id =
-		firstText(node, ["id", "uuid", "annotationId", "annotation_id"]) ??
-		`annotation-${index + 1}`;
+		firstText(node, [
+			"id",
+			"uuid",
+			"identifier",
+			"annotationId",
+			"annotation_id",
+		]) ?? `annotation-${index + 1}`;
 	const dateValue =
 		firstText(node, ["date", "createdAt", "created", "timestamp"]) ??
 		new Date(0).toISOString();
@@ -209,11 +201,7 @@ function firstText(node: unknown, candidateKeys: string[]): string | undefined {
 	}
 
 	for (const [key, value] of Object.entries(node)) {
-		if (
-			candidateKeys.some(
-				(candidate) => candidate.toLowerCase() === key.toLowerCase(),
-			)
-		) {
+		if (matchesAnyCandidateKey(key, candidateKeys)) {
 			if (typeof value === "string") {
 				const trimmed = value.trim();
 				if (trimmed) {
@@ -236,10 +224,14 @@ function firstText(node: unknown, candidateKeys: string[]): string | undefined {
 }
 
 function normalizeText(value: string): string {
-	return value
-		.replaceAll("\r\n", "\n")
-		.split("\n")
-		.map((line) => line.trim().replaceAll(/\s+/g, " "))
+	const cleanedLines = stripLowSignalBoundaryLines(
+		value
+			.replaceAll("\r\n", "\n")
+			.split("\n")
+			.map((line) => line.trim().replaceAll(/\s+/g, " ")),
+	);
+
+	return cleanedLines
 		.filter(
 			(line, index, array) =>
 				!(line === "" && index > 0 && array[index - 1] === ""),
@@ -292,6 +284,66 @@ function parseColor(value: string | undefined): AnnotationColor | undefined {
 	}
 
 	return undefined;
+}
+
+function stripLowSignalBoundaryLines(lines: string[]): string[] {
+	let start = 0;
+	let end = lines.length;
+
+	while (
+		start < end &&
+		isLowSignalLine(lines[start] ?? "") &&
+		hasSubstantiveLine(lines, start + 1, end)
+	) {
+		start += 1;
+	}
+
+	while (
+		end > start &&
+		isLowSignalLine(lines[end - 1] ?? "") &&
+		hasSubstantiveLine(lines, start, end - 1)
+	) {
+		end -= 1;
+	}
+
+	return lines.slice(start, end);
+}
+
+function hasSubstantiveLine(
+	lines: string[],
+	start: number,
+	end: number,
+): boolean {
+	for (let index = start; index < end; index += 1) {
+		const line = lines[index] ?? "";
+		if (line && !isLowSignalLine(line)) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+function isLowSignalLine(line: string): boolean {
+	const compact = line.replaceAll(/\s+/g, "").trim();
+	if (compact.length === 0 || compact.length > 3) {
+		return false;
+	}
+
+	return !/[\p{L}\p{N}]/u.test(compact);
+}
+
+function matchesAnyCandidateKey(key: string, candidateKeys: string[]): boolean {
+	const normalizedKey = normalizeKey(key);
+	return candidateKeys.some(
+		(candidateKey) => normalizeKey(candidateKey) === normalizedKey,
+	);
+}
+
+function normalizeKey(value: string): string {
+	const withoutAttributes = value.replace(/^@+/, "").toLowerCase();
+	const segments = withoutAttributes.split(":");
+	return segments[segments.length - 1] ?? withoutAttributes;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

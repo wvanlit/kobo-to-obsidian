@@ -7,6 +7,7 @@ import {
 	renderChapterMarkdown,
 	renderSingleBookMarkdown,
 } from "./render-markdown";
+import { resolveBookTitle } from "./resolve-book-title";
 
 export interface OutputDocument {
 	relativePath: FilePath;
@@ -18,7 +19,11 @@ export function buildExportPlan(
 	mode: OutputMode,
 ): OutputDocument[] {
 	const bookTitle = sanitizePathSegment(
-		book.metadata.title ?? book.book.titleFromAnnot ?? "Untitled Book",
+		resolveBookTitle({
+			metadataTitle: book.metadata.title,
+			annotTitle: book.book.titleFromAnnot,
+			sourceAnnotPath: book.book.sourceAnnotPath,
+		}),
 	);
 
 	if (mode === "single") {

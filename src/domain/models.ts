@@ -71,14 +71,7 @@ export class BookAggregate {
 		titleFromAnnot?: string;
 		authorFromAnnot?: string;
 	}): BookAggregate {
-		const sortedAnnotations = [...props.annotations].sort((a, b) => {
-			const byTime = a.createdAt.getTime() - b.createdAt.getTime();
-			if (byTime !== 0) {
-				return byTime;
-			}
-
-			return a.id.localeCompare(b.id);
-		});
+		const sortedAnnotations = [...props.annotations].sort(compareAnnotations);
 
 		return new BookAggregate(
 			props.sourceAnnotPath,
@@ -88,6 +81,92 @@ export class BookAggregate {
 			props.authorFromAnnot,
 		);
 	}
+}
+
+function compareAnnotations(a: Annotation, b: Annotation): number {
+	if (
+		a.progress !== undefined &&
+		b.progress !== undefined &&
+		a.progress !== b.progress
+	) {
+		return a.progress - b.progress;
+	}
+
+	const byFragmentPath = normalizeFragmentPath(a.fragmentStart).localeCompare(
+		normalizeFragmentPath(b.fragmentStart),
+		undefined,
+		{ numeric: true, sensitivity: "base" },
+	);
+	if (byFragmentPath !== 0) {
+		return byFragmentPath;
+	}
+
+	const byPoint = comparePointLocation(a.fragmentStart, b.fragmentStart);
+	if (byPoint !== 0) {
+		return byPoint;
+	}
+
+	const byTime = a.createdAt.getTime() - b.createdAt.getTime();
+	if (byTime !== 0) {
+		return byTime;
+	}
+
+	return a.id.localeCompare(b.id);
+}
+
+function normalizeFragmentPath(fragmentStart: string): string {
+	const beforeHash = fragmentStart.split("#", 1)[0] ?? "";
+	return decodeURIComponent(beforeHash)
+		.replaceAll("\\", "/")
+		.replace(/^\.\//, "")
+		.toLowerCase();
+}
+
+function comparePointLocation(
+	fragmentStartA: string,
+	fragmentStartB: string,
+): number {
+	const pointA = parsePointLocation(fragmentStartA);
+	const pointB = parsePointLocation(fragmentStartB);
+
+	const length = Math.max(pointA.path.length, pointB.path.length);
+	for (let index = 0; index < length; index += 1) {
+		const segmentA = pointA.path[index] ?? -1;
+		const segmentB = pointB.path[index] ?? -1;
+		if (segmentA !== segmentB) {
+			return segmentA - segmentB;
+		}
+	}
+
+	if (pointA.offset !== pointB.offset) {
+		return pointA.offset - pointB.offset;
+	}
+
+	return 0;
+}
+
+function parsePointLocation(fragmentStart: string): {
+	path: number[];
+	offset: number;
+} {
+	const match = /#point\(([^)]*)\)/i.exec(fragmentStart);
+	if (!match) {
+		return { path: [], offset: -1 };
+	}
+
+	const location = match[1] ?? "";
+	const [pathPart, offsetPart] = location.split(":", 2);
+	const path = (pathPart ?? "")
+		.split("/")
+		.filter(Boolean)
+		.map((segment) => Number(segment))
+		.filter((segment) => Number.isFinite(segment));
+	const offset = Number(offsetPart);
+
+	return {
+		path,
+		offset: Number.isFinite(offset) ? offset : -1,
+	};
 }
 
 export class ChapterRef {

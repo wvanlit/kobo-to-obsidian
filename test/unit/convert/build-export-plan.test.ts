@@ -35,9 +35,25 @@ describe("buildExportPlan", () => {
 			"Fixture Book/02 - Chapter Two.md",
 		);
 	});
+
+	it("derives file name from annot path when title is missing", () => {
+		const book = fixtureBook({
+			titleFromAnnot: undefined,
+			metadataTitle: undefined,
+			sourceAnnotPath:
+				"/tmp/A System for Writing_ How an Unconventional Approach.epub.annot",
+		});
+
+		const docs = buildExportPlan(book, "single");
+		expect(String(docs[0]?.relativePath)).toBe("A System for Writing.md");
+	});
 });
 
-function fixtureBook(): EnrichedBook {
+function fixtureBook(options?: {
+	titleFromAnnot?: string;
+	metadataTitle?: string;
+	sourceAnnotPath?: string;
+}): EnrichedBook {
 	const chapterOne = ChapterRef.create({
 		id: asChapterId("chapter-1"),
 		title: "Chapter One",
@@ -67,14 +83,22 @@ function fixtureBook(): EnrichedBook {
 	});
 
 	const aggregate = BookAggregate.create({
-		sourceAnnotPath: asAnnotFilePath("/tmp/sample.annot"),
+		sourceAnnotPath: asAnnotFilePath(
+			options?.sourceAnnotPath ?? "/tmp/sample.annot",
+		),
 		annotations: [annotationOne, annotationTwo],
-		titleFromAnnot: "Fixture Book",
+		titleFromAnnot:
+			options && "titleFromAnnot" in options
+				? options.titleFromAnnot
+				: "Fixture Book",
 	});
 
 	const metadata = BookMetadata.create({
 		chapters: [chapterOne, chapterTwo],
-		title: "Fixture Book",
+		title:
+			options && "metadataTitle" in options
+				? options.metadataTitle
+				: "Fixture Book",
 	});
 
 	return EnrichedBook.create({

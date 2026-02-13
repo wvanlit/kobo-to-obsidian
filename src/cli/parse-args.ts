@@ -3,6 +3,10 @@ import {
 	type DirectoryPath,
 	type OutputMode,
 } from "../domain/shared";
+import {
+	type AiRefactorOptions,
+	DEFAULT_AI_REFACTOR_MODEL,
+} from "../refactor/ai-refactor-config";
 
 export interface CliArgs {
 	input?: string;
@@ -11,6 +15,7 @@ export interface CliArgs {
 	interactive: boolean;
 	selectAll: boolean;
 	bookFilters: string[];
+	aiRefactor?: AiRefactorOptions;
 }
 
 export function parseArgs(argv: string[]): CliArgs {
@@ -20,6 +25,8 @@ export function parseArgs(argv: string[]): CliArgs {
 	let interactive = true;
 	let selectAll = false;
 	const bookFilters: string[] = [];
+	let aiRefactor = false;
+	let aiRefactorModel: string | undefined;
 
 	for (let index = 0; index < argv.length; index += 1) {
 		const arg = argv[index];
@@ -64,11 +71,32 @@ export function parseArgs(argv: string[]): CliArgs {
 				bookFilters.push(filter);
 			}
 			index += 1;
+			continue;
+		}
+
+		if (arg === "--ai-refactor") {
+			aiRefactor = true;
+			continue;
+		}
+
+		if (arg === "--ai-refactor-model") {
+			const model = argv[index + 1];
+			if (!model || model.startsWith("--")) {
+				throw new Error(
+					"Missing required argument: --ai-refactor-model <provider/model>",
+				);
+			}
+			aiRefactorModel = model;
+			index += 1;
 		}
 	}
 
 	if (!output) {
 		throw new Error("Missing required argument: --output <directory>");
+	}
+
+	if (aiRefactorModel && !aiRefactor) {
+		throw new Error("--ai-refactor-model requires --ai-refactor");
 	}
 
 	return {
@@ -78,5 +106,10 @@ export function parseArgs(argv: string[]): CliArgs {
 		interactive,
 		selectAll,
 		bookFilters,
+		aiRefactor: aiRefactor
+			? {
+					model: aiRefactorModel ?? DEFAULT_AI_REFACTOR_MODEL,
+				}
+			: undefined,
 	};
 }
