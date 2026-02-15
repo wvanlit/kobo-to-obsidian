@@ -1,14 +1,18 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { $ } from "bun";
 
 import type { OutputDocument } from "../convert/build-export-plan";
-import { DEFAULT_AI_REFACTOR_MODEL } from "./ai-refactor-config";
+import {
+	DEFAULT_AI_REFACTOR_MODEL,
+	DEFAULT_AI_REFACTOR_VARIANT,
+} from "./ai-refactor-config";
 
 export interface RefactorDocumentsWithOpenCodeOptions {
 	documents: OutputDocument[];
+	inputFilePathByRelativePath?: Readonly<Record<string, string>>;
 	model?: string;
+	variant?: string;
 }
 
 export interface RefactorDocumentsWithOpenCodeResult {
@@ -19,7 +23,9 @@ export interface RefactorDocumentsWithOpenCodeResult {
 export interface RunOpenCodeRequest {
 	markdown: string;
 	relativePath: string;
+	inputFilePath?: string;
 	model: string;
+	variant: string;
 }
 
 export type RunOpenCode = (request: RunOpenCodeRequest) => Promise<string>;
@@ -34,18 +40,22 @@ export async function refactorDocumentsWithOpenCode(
 ): Promise<RefactorDocumentsWithOpenCodeResult> {
 	const runOpenCode = dependencies.runOpenCode ?? runOpenCodeCli;
 	const model = options.model ?? DEFAULT_AI_REFACTOR_MODEL;
+	const variant = options.variant ?? DEFAULT_AI_REFACTOR_VARIANT;
 	const warnings: string[] = [];
 	const documents: OutputDocument[] = [];
 
 	for (const document of options.documents) {
 		try {
-			const refactored = normalizeRefactorOutput(
-				await runOpenCode({
-					markdown: document.markdown,
-					relativePath: document.relativePath,
-					model,
-				}),
-			);
+			const request = {
+				markdown: document.markdown,
+				relativePath: document.relativePath,
+				inputFilePath:
+					options.inputFilePathByRelativePath?.[document.relativePath],
+				model,
+				variant,
+			};
+
+			const refactored = normalizeRefactorOutput(await runOpenCode(request));
 
 			if (!refactored.trim()) {
 				warnings.push(
@@ -74,15 +84,23 @@ export async function refactorDocumentsWithOpenCode(
 }
 
 async function runOpenCodeCli(request: RunOpenCodeRequest): Promise<string> {
-	const tempDirectory = await mkdtemp(path.join(tmpdir(), "kobo-opencode-"));
-	const inputPath = path.join(tempDirectory, "document.md");
+	const tempRoot = path.join(process.cwd(), ".tmp");
+	let tempDirectory: string | undefined;
+	let inputPath = request.inputFilePath;
 
 	try {
-		await writeFile(inputPath, request.markdown, "utf8");
+		if (!inputPath) {
+			await mkdir(tempRoot, { recursive: true });
+			tempDirectory = await mkdtemp(path.join(tempRoot, "kobo-opencode-"));
+			inputPath = path.join(tempDirectory, "document.md");
+			await writeFile(inputPath, request.markdown, "utf8");
+		}
 
-		return await $`opencode run --model ${request.model} --file ${inputPath} -- ${buildRefactorPrompt(request.relativePath)}`.text();
+		return await $`opencode run --model ${request.model} --variant ${request.variant} --file ${inputPath} -- ${buildRefactorPrompt(request.relativePath)}`.text();
 	} finally {
-		await rm(tempDirectory, { recursive: true, force: true });
+		if (tempDirectory) {
+			await rm(tempDirectory, { recursive: true, force: true });
+		}
 	}
 }
 
@@ -104,9 +122,12 @@ function buildRefactorPrompt(relativePath: string): string {
 		"- Fold note text into the relevant points.",
 		"- Do not invent facts, claims, or quotations not present in the input.",
 		"- Do not mention these instructions.",
+		"- Sparesly highlight to improve scanning of notes.",
+		"- Do not attempt to gain more information by reading other files, only read the file allotted to you and refactor it to the best of your ability based on the content of that file.",
 		"",
 		"Output requirements:",
-		"- Return only the final markdown document.",
+		"- Respond with only the revised markdown document.",
+		"- If no changes are needed, return the original markdown unchanged.",
 		"- Do not wrap the answer in code fences.",
 	].join("\n");
 }

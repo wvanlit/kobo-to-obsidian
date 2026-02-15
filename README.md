@@ -21,11 +21,14 @@ bun run convert -- --output /path/to/obsidian/vault
 --select-all
 --book <pattern>
 --ai-refactor
---ai-refactor-model <provider/model>
+--ai-refactor [provider/model[/variant]]
+--ai-refacotr [provider/model/variant]
+--ai-refactor-model <provider/model[/variant]>
 ```
 
 When `--ai-refactor` is enabled, generated Markdown is refined per output file via your local `opencode` CLI.
-Default model: `openai/gpt-5.1-codex-mini`.
+Default model: `openai/gpt-5.2`.
+Default variant: `medium`.
 
 ## End-to-End Harness
 

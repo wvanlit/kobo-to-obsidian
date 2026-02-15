@@ -104,11 +104,22 @@ export async function runConversion(
 		let outputDocs = docs;
 
 		if (options.aiRefactor) {
+			const preAiWritten = await writeOutputDocuments(options.outputDir, docs);
+			const inputFilePathByRelativePath: Record<string, string> = {};
+			for (const [index, document] of docs.entries()) {
+				const inputFilePath = preAiWritten[index];
+				if (inputFilePath) {
+					inputFilePathByRelativePath[document.relativePath] = inputFilePath;
+				}
+			}
+
 			const refactor =
 				dependencies.refactorDocuments ?? refactorDocumentsWithOpenCode;
 			const refactorResult = await refactor({
 				documents: docs,
+				inputFilePathByRelativePath,
 				model: options.aiRefactor.model,
+				variant: options.aiRefactor.variant,
 			});
 			outputDocs = refactorResult.documents;
 			warnings.push(...refactorResult.warnings);

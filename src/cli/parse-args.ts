@@ -6,6 +6,7 @@ import {
 import {
 	type AiRefactorOptions,
 	DEFAULT_AI_REFACTOR_MODEL,
+	DEFAULT_AI_REFACTOR_VARIANT,
 } from "../refactor/ai-refactor-config";
 
 export interface CliArgs {
@@ -26,7 +27,7 @@ export function parseArgs(argv: string[]): CliArgs {
 	let selectAll = false;
 	const bookFilters: string[] = [];
 	let aiRefactor = false;
-	let aiRefactorModel: string | undefined;
+	let aiRefactorOptions: AiRefactorOptions | undefined;
 
 	for (let index = 0; index < argv.length; index += 1) {
 		const arg = argv[index];
@@ -74,19 +75,24 @@ export function parseArgs(argv: string[]): CliArgs {
 			continue;
 		}
 
-		if (arg === "--ai-refactor") {
+		if (arg === "--ai-refactor" || arg === "--ai-refacotr") {
 			aiRefactor = true;
+			const value = argv[index + 1];
+			if (value && !value.startsWith("--")) {
+				aiRefactorOptions = parseAiRefactorModelArg(value);
+				index += 1;
+			}
 			continue;
 		}
 
 		if (arg === "--ai-refactor-model") {
-			const model = argv[index + 1];
-			if (!model || model.startsWith("--")) {
+			const value = argv[index + 1];
+			if (!value || value.startsWith("--")) {
 				throw new Error(
-					"Missing required argument: --ai-refactor-model <provider/model>",
+					"Missing required argument: --ai-refactor-model <provider/model[/variant]>",
 				);
 			}
-			aiRefactorModel = model;
+			aiRefactorOptions = parseAiRefactorModelArg(value);
 			index += 1;
 		}
 	}
@@ -95,7 +101,7 @@ export function parseArgs(argv: string[]): CliArgs {
 		throw new Error("Missing required argument: --output <directory>");
 	}
 
-	if (aiRefactorModel && !aiRefactor) {
+	if (aiRefactorOptions && !aiRefactor) {
 		throw new Error("--ai-refactor-model requires --ai-refactor");
 	}
 
@@ -108,8 +114,23 @@ export function parseArgs(argv: string[]): CliArgs {
 		bookFilters,
 		aiRefactor: aiRefactor
 			? {
-					model: aiRefactorModel ?? DEFAULT_AI_REFACTOR_MODEL,
+					model: aiRefactorOptions?.model ?? DEFAULT_AI_REFACTOR_MODEL,
+					variant: aiRefactorOptions?.variant ?? DEFAULT_AI_REFACTOR_VARIANT,
 				}
 			: undefined,
+	};
+}
+
+function parseAiRefactorModelArg(value: string): AiRefactorOptions {
+	const [provider, model, variant, extra] = value.split("/");
+	if (!provider || !model || extra) {
+		throw new Error(
+			"Invalid --ai-refactor-model value, expected <provider/model[/variant]>",
+		);
+	}
+
+	return {
+		model: `${provider}/${model}`,
+		variant: variant || DEFAULT_AI_REFACTOR_VARIANT,
 	};
 }
